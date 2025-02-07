@@ -23,9 +23,9 @@ app.use(cookieParser());
 app.use(cors({
   origin: [process.env.FRONTEND_URL || 'http://localhost:3000'],
   credentials: true,
-  methods: ['GET', 'POST', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin'],
-  exposedHeaders: ['Set-Cookie', 'Authorization'],
+  exposedHeaders: ['Set-Cookie']
 }));
 
 // Configure multer for video upload
@@ -58,7 +58,7 @@ const upload = multer({
 const oauth2Client = new OAuth2Client(
   process.env.YOUTUBE_CLIENT_ID,
   process.env.YOUTUBE_CLIENT_SECRET,
-  process.env.CALLBACK_URL || 'http://localhost:5000/auth/callback'
+  process.env.CALLBACK_URL
 );
 
 const youtube = google.youtube('v3');
@@ -92,15 +92,16 @@ app.get('/auth/callback', async (req, res) => {
       secure: true,
       sameSite: 'none',
       path: '/',
+      domain: '.onrender.com',
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : 'localhost'
     });
 
-    console.log('Setting cookie:', tokens);  // Add debug log
-    res.redirect(`${process.env.FRONTEND_URL}?auth=success`);
+    console.log('Setting cookie:', tokens);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    res.redirect(process.env.FRONTEND_URL + '?auth=success');
   } catch (error) {
     console.error('Auth callback error:', error);
-    res.redirect(`${process.env.FRONTEND_URL}?error=auth_failed`);
+    res.redirect(process.env.FRONTEND_URL + '?error=auth_failed');
   }
 });
 
