@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: ytstream-py
+    name: ytstream-yt4
     env: node
     buildCommand: npm install && apt-get update && apt-get install -y ffmpeg
     startCommand: node server.js
@@ -14,4 +14,4 @@ services:
       - key: FRONTEND_URL
         value: https://ytsattu.netlify.app
       - key: CALLBACK_URL
-        value: https://ytstream-py.onrender.com/auth/callback 
+        value: https://ytstream-yt4.onrender.com/auth/callback 
