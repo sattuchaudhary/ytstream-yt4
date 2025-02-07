@@ -9,6 +9,8 @@ const { google } = require('googleapis');
 const { OAuth2Client } = require('google-auth-library');
 const cookieParser = require('cookie-parser');
 const fs = require('fs');
+const session = require('express-session');
+const MemoryStore = require('memorystore')(session);
 const errorHandler = require('./middleware/error');
 const checkAuth = require('./middleware/auth');
 const ffmpegService = require('./services/ffmpeg');
@@ -18,6 +20,21 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
+app.use(session({
+  secret: 'your-secret-key',
+  resave: false,
+  saveUninitialized: false,
+  store: new MemoryStore({
+    checkPeriod: 86400000 // prune expired entries every 24h
+  }),
+  cookie: {
+    secure: true,
+    httpOnly: true,
+    sameSite: 'none',
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
+}));
+
 app.use(express.json());
 app.use(cookieParser());
 app.use(cors({
@@ -25,7 +42,7 @@ app.use(cors({
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'Cookie'],
-  exposedHeaders: ['Set-Cookie', 'Authorization'],
+  exposedHeaders: ['Set-Cookie'],
   preflightContinue: true,
   optionsSuccessStatus: 204
 }));
@@ -78,59 +95,23 @@ app.get('/auth/callback', async (req, res) => {
   try {
     const { code } = req.query;
     const { tokens } = await oauth2Client.getToken(code);
-    oauth2Client.setCredentials(tokens);
     
-    // Get channel info
-    const response = await youtube.channels.list({
-      auth: oauth2Client,
-      part: 'snippet',
-      mine: true
-    });
-
-    // Check if response has items
-    if (!response.data.items || response.data.items.length === 0) {
-      console.error('No channel info found:', response.data);
-      throw new Error('No channel information found');
-    }
-
-    const channelInfo = response.data.items[0].snippet;
+    // Store tokens in session
+    req.session.tokens = tokens;
     
-    res.cookie('youtube_credentials', tokens, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'none',
-      path: '/',
-      domain: '.onrender.com',
-      maxAge: 86400000, // 24 hours
-    });
-
-    // Store token in session
-    req.session = {
-      tokens
-    };
-
-    console.log('Setting cookie:', tokens);
-    // Add delay before redirect
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    res.redirect(process.env.FRONTEND_URL + '?auth=success&token=' + tokens.access_token);
+    console.log('Setting session:', tokens);
+    res.redirect(process.env.FRONTEND_URL + '?auth=success');
   } catch (error) {
     console.error('Auth callback error:', error);
-    console.log('Full error details:', {
-      message: error.message,
-      stack: error.stack,
-      response: error.response?.data
-    });
     res.redirect(process.env.FRONTEND_URL + '?error=auth_failed');
   }
 });
 
 app.get('/auth/status', async (req, res) => {
   try {
-    const tokens = req.cookies.youtube_credentials;
-    console.log('Auth status check - Cookies:', req.cookies);
+    const tokens = req.session.tokens;
     
     if (!tokens) {
-      console.log('No tokens found in cookies');
       return res.json({ authenticated: false });
     }
 
@@ -174,7 +155,7 @@ app.post('/start-stream', upload.single('video'), async (req, res) => {
     const videoPath = req.file.path;
     
     // Set credentials from cookie
-    oauth2Client.setCredentials(req.tokens);
+    oauth2Client.setCredentials(req.session.tokens);
     
     // Create broadcast and stream
     console.log('Creating broadcast and stream...');
@@ -367,16 +348,6 @@ app.post('/cleanup', checkAuth, async (req, res) => {
 // Add this for Render's health check
 app.get('/', (req, res) => {
   res.json({ status: 'ok' });
-});
-
-// Add session middleware
-app.use((req, res, next) => {
-  if (req.cookies.youtube_credentials) {
-    req.session = {
-      tokens: req.cookies.youtube_credentials
-    };
-  }
-  next();
 });
 
 // Error handling middleware
