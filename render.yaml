@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: ytstream-py
+    env: node
+    buildCommand: npm install && apt-get update && apt-get install -y ffmpeg
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: YOUTUBE_CLIENT_ID
+        sync: false
+      - key: YOUTUBE_CLIENT_SECRET
+        sync: false
+      - key: FRONTEND_URL
+        value: https://ytsattu.netlify.app
+      - key: CALLBACK_URL
+        value: https://ytstream-py.onrender.com/auth/callback 
