@@ -26,7 +26,7 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'Cookie'],
   exposedHeaders: ['Set-Cookie', 'Authorization'],
-  preflightContinue: false,
+  preflightContinue: true,
   optionsSuccessStatus: 204
 }));
 
@@ -100,12 +100,19 @@ app.get('/auth/callback', async (req, res) => {
       secure: true,
       sameSite: 'none',
       path: '/',
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      domain: process.env.NODE_ENV === 'production' ? 'onrender.com' : 'localhost'
+      domain: '.onrender.com',
+      maxAge: 86400000, // 24 hours
     });
 
+    // Store token in session
+    req.session = {
+      tokens
+    };
+
     console.log('Setting cookie:', tokens);
-    res.redirect(process.env.FRONTEND_URL + '?auth=success');
+    // Add delay before redirect
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    res.redirect(process.env.FRONTEND_URL + '?auth=success&token=' + tokens.access_token);
   } catch (error) {
     console.error('Auth callback error:', error);
     console.log('Full error details:', {
@@ -360,6 +367,16 @@ app.post('/cleanup', checkAuth, async (req, res) => {
 // Add this for Render's health check
 app.get('/', (req, res) => {
   res.json({ status: 'ok' });
+});
+
+// Add session middleware
+app.use((req, res, next) => {
+  if (req.cookies.youtube_credentials) {
+    req.session = {
+      tokens: req.cookies.youtube_credentials
+    };
+  }
+  next();
 });
 
 // Error handling middleware
