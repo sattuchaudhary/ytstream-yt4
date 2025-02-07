@@ -26,7 +26,7 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'Cookie'],
   exposedHeaders: ['Set-Cookie', 'Authorization'],
-  preflightContinue: true,
+  preflightContinue: false,
   optionsSuccessStatus: 204
 }));
 
@@ -100,7 +100,8 @@ app.get('/auth/callback', async (req, res) => {
       secure: true,
       sameSite: 'none',
       path: '/',
-      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      domain: process.env.NODE_ENV === 'production' ? 'onrender.com' : 'localhost'
     });
 
     console.log('Setting cookie:', tokens);
@@ -119,7 +120,10 @@ app.get('/auth/callback', async (req, res) => {
 app.get('/auth/status', async (req, res) => {
   try {
     const tokens = req.cookies.youtube_credentials;
+    console.log('Auth status check - Cookies:', req.cookies);
+    
     if (!tokens) {
+      console.log('No tokens found in cookies');
       return res.json({ authenticated: false });
     }
 
@@ -130,6 +134,8 @@ app.get('/auth/status', async (req, res) => {
       part: 'snippet',
       mine: true
     });
+
+    console.log('Channel list response:', response.data);
 
     // Check if response has items
     if (!response.data.items || response.data.items.length === 0) {
