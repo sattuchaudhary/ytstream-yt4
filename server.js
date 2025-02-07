@@ -24,8 +24,10 @@ app.use(cors({
   origin: [process.env.FRONTEND_URL || 'http://localhost:3000'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin'],
-  exposedHeaders: ['Set-Cookie']
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'Cookie'],
+  exposedHeaders: ['Set-Cookie', 'Authorization'],
+  preflightContinue: true,
+  optionsSuccessStatus: 204
 }));
 
 // Configure multer for video upload
@@ -85,6 +87,12 @@ app.get('/auth/callback', async (req, res) => {
       mine: true
     });
 
+    // Check if response has items
+    if (!response.data.items || response.data.items.length === 0) {
+      console.error('No channel info found:', response.data);
+      throw new Error('No channel information found');
+    }
+
     const channelInfo = response.data.items[0].snippet;
     
     res.cookie('youtube_credentials', tokens, {
@@ -92,15 +100,18 @@ app.get('/auth/callback', async (req, res) => {
       secure: true,
       sameSite: 'none',
       path: '/',
-      domain: '.onrender.com',
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours
     });
 
     console.log('Setting cookie:', tokens);
-    await new Promise(resolve => setTimeout(resolve, 1000));
     res.redirect(process.env.FRONTEND_URL + '?auth=success');
   } catch (error) {
     console.error('Auth callback error:', error);
+    console.log('Full error details:', {
+      message: error.message,
+      stack: error.stack,
+      response: error.response?.data
+    });
     res.redirect(process.env.FRONTEND_URL + '?error=auth_failed');
   }
 });
@@ -119,6 +130,12 @@ app.get('/auth/status', async (req, res) => {
       part: 'snippet',
       mine: true
     });
+
+    // Check if response has items
+    if (!response.data.items || response.data.items.length === 0) {
+      console.error('No channel info found in status check:', response.data);
+      return res.json({ authenticated: false });
+    }
 
     const channelInfo = response.data.items[0].snippet;
     
