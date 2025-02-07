@@ -92,14 +92,15 @@ app.get('/auth/callback', async (req, res) => {
       secure: true,
       sameSite: 'none',
       path: '/',
-      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : 'localhost'
     });
 
     console.log('Setting cookie:', tokens);  // Add debug log
-    res.redirect('http://localhost:3000?auth=success');
+    res.redirect(`${process.env.FRONTEND_URL}?auth=success`);
   } catch (error) {
     console.error('Auth callback error:', error);
-    res.redirect('http://localhost:3000?error=auth_failed');
+    res.redirect(`${process.env.FRONTEND_URL}?error=auth_failed`);
   }
 });
 
